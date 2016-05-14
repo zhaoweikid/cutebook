@@ -1,3 +1,3 @@
-CuteBook 1.0
+## CuteBook
 
-CuteBook is a book reader
+CuteBook is a simple book reader write with python and pygame.
