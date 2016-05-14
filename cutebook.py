@@ -3,10 +3,14 @@ import sys, string, os, types
 basepath = os.path.dirname(os.path.abspath(sys.argv[0]))
 import pygame, locale, types, pickle, time, math, traceback
 from pygame.locals import *
-from logger import logfile, charset
-import netbook
+import logging as log
 
 VERSION = 'CuteBook 1.0'
+
+if sys.platform.startswith('win'):
+    charset = 'gbk'
+else:
+    charset = 'utf-8'
 
 class FilePanel:
     DIR_CHANGE_UP   = 1
@@ -37,7 +41,7 @@ class FilePanel:
 
         self.display_files = []
         self.dir_changed = True
- 
+
         # 显示的滑动窗口
         self.scroll_win = [0, self.fileline]
 
@@ -112,7 +116,7 @@ class FilePanel:
                     pos = self.display_files.index(self.lastdir+'/')
                     #print 'file pos:', pos
                 except:
-                    logfile.info('nof found dir name:', self.lastdir)
+                    log.info('nof found dir name: %s', self.lastdir)
                 else:
                     self.cursor_pos = pos
                     if self.cursor_pos >= self.scroll_win[1]:
@@ -133,7 +137,7 @@ class FilePanel:
         self.sf.blit(self.cursor_sf, area, self.cursor_sf.get_rect())
         
     def get_value(self):
-        logfile.info('path:', self.current_path, 'pos:', self.cursor_pos, 'display_files:', len(self.display_files))
+        log.info('path:%s pos:%s display_files:%d', self.current_path, self.cursor_pos, len(self.display_files))
         if len(self.display_files) == 0:
             return ''
         return os.path.join(self.current_path, self.display_files[self.cursor_pos])
@@ -151,7 +155,7 @@ class FilePanel:
         self.scroll_win = [0, self.fileline]
 
     def dir_down(self, name):
-        logfile.info('dir name:', name)
+        log.info('dir name:%s', name)
         self.current_path = os.path.join(self.current_path, name.strip('/'))
         self.dir_changed = True
         self.cursor_pos = 0
@@ -178,14 +182,14 @@ class FilePanel:
                  evt.key == pygame.K_RETURN or evt.key == pygame.K_KP_ENTER:
                 filepath = self.get_value()
                 filename = os.path.basename(filepath.rstrip('/'))
-                logfile.info('in dir:', filepath, filename)
+                log.info('in dir: %s %s', filepath, filename)
                 if filepath:
-                    logfile.info('is filename:', os.path.join(self.current_path, filename))
+                    log.info('is filename: %s', os.path.join(self.current_path, filename))
                     if os.path.isfile(os.path.join(self.current_path, filename)):
                         return 'text'
-                    netfile = os.path.join(self.current_path, filename, 'cutebook_index')
-                    if os.path.isfile(netfile):
-                        return 'netbook'
+                    #netfile = os.path.join(self.current_path, filename, 'cutebook_index')
+                    #if os.path.isfile(netfile):
+                    #    return 'netbook'
                     self.dir_down(filename)
 
         return None
@@ -209,7 +213,7 @@ class LogoPanel:
         textpos.centery = self.window.get_rect().centery - self.font_size
         self.window.blit(textsf, textpos)
 
-        authorsf = self.font.render('by: zhaoweikid', 1, (255, 0, 0))
+        authorsf = self.font.render('zhaoweikid', 1, (255, 0, 0))
         apos = authorsf.get_rect()
         apos.centerx = self.window.get_rect().centerx
         apos.centery = self.window.get_rect().centery + self.font_size * 2 - self.font_size
@@ -320,7 +324,7 @@ class TextPanel:
         s = f.read()
         f.close()
         
-        self.content = unicode(s, 'gbk', 'ignore')
+        self.content = unicode(s, charset, 'ignore')
         s = None
         self.lines = []
         
@@ -382,6 +386,8 @@ class TextPanel:
             count = min(self.rows, len(self.lines) - self.lineno)
             for i in range(0, count):
                 s = self.lines[self.lineno + i]        
+                if s == '\x00':
+                    continue
                 textsf  = self.font.render(s, 1, (255,255,255))
                 textpos = textsf.get_rect()
                 textpos.top += i * (self.font_size + self.linesp)
@@ -500,7 +506,7 @@ class NetbookPanel:
         
         if not self.lastchapter and len(self.book_index['chapterlist']) > 0:
             self.lastchapter = self.book_index['chapterlist'][0][0]
-        logfile.info('lastchapter:', self.lastchapter)
+        log.info('lastchapter: %s', self.lastchapter)
         
         chlist = self.book_index['chapterlist']
         for i in range(0, len(chlist)):
@@ -522,7 +528,7 @@ class NetbookPanel:
 
         self.imagesf = []
         for x in cns:
-            logfile.info('open chapter:', x)
+            log.info('open chapter: %s', x)
             if x.endswith('.txt'):
                 self.openchapter_txt(x)
             else:
@@ -541,7 +547,7 @@ class NetbookPanel:
         s = f.read()
         f.close()
 
-        self.content = unicode(s, 'gbk', 'ignore')
+        self.content = unicode(s, charset, 'ignore')
         s = None
         self.lines = []
         
@@ -621,7 +627,7 @@ class NetbookPanel:
             self.draw_foot()
 
     def display_image(self):
-        logfile.info('image pos:', self.image_pos)
+        log.info('image pos: %s', self.image_pos)
         if self.image_pos >= len(self.imagesf):
             return
 
@@ -669,11 +675,11 @@ class NetbookPanel:
  
 
     def update(self):
-        logfile.info('update ...')
+        log.info('update ...')
         bookname = self.bookname
         self.dump()
-        nb = netbook.NetBook(self.bookpath, self.draw_update)
-        nb.download(bookname)
+        #nb = netbook.NetBook(self.bookpath, self.draw_update)
+        #nb.download(bookname)
 
         self.openbook(self.bookpath)
         nb = None
@@ -711,18 +717,17 @@ class NetbookPanel:
 class CuteBook:
     def __init__(self):
         pygame.init()
+        self.window_size = (800, 480)
+
         if sys.platform.startswith('win'):
-            self.window_size = (800, 480)
             self.window = pygame.display.set_mode(self.window_size, pygame.HWSURFACE|pygame.DOUBLEBUF)
         elif sys.platform == 'darwin':
-            self.window_size = (800, 480)
             self.window = pygame.display.set_mode(self.window_size, pygame.HWSURFACE|pygame.DOUBLEBUF)
         else:
             f = open('/etc/issue', 'r')
             s = f.read()
             f.close()
 
-            self.window_size = (800, 480)
             if s.find('maemo') >= 0:
                 self.window = pygame.display.set_mode(self.window_size, pygame.HWSURFACE|pygame.DOUBLEBUF|pygame.NOFRAME)
             else:
@@ -739,7 +744,8 @@ class CuteBook:
         self.panels = {'logo':LogoPanel(self.window, self.font, self.font_size, self.font_path), 
                        'file':FilePanel(self.window, self.font, self.font_size),
                        'text':TextPanel(self.window, self.font, self.font_size),
-                       'netbook':NetbookPanel(self.window, self.font, self.font_size)}
+                       #'netbook':NetbookPanel(self.window, self.font, self.font_size)
+                       }
 
         self.panel_pos = 'logo'
 
@@ -765,6 +771,10 @@ class CuteBook:
             checkdir = os.path.join(fontdir, 'zh_CN')
             if os.path.isdir(checkdir):
                 fopath = self.font_in_dir(os.path.join(checkdir, 'TrueType'))
+                if fopath:
+                    return fopath
+            else:
+                fopath = self.font_in_dir(os.path.join(fontdir, 'TrueType'))
                 if fopath:
                     return fopath
 
@@ -793,17 +803,17 @@ class CuteBook:
                     #print 'lastbook:', panel.book_history['__lastbook']
                     panel.openbook(panel.book_history[panel.book_history['__lastbook']]['path'])
 
-            elif newpanel == 'netbook':
-                dirname = self.panels['file'].get_value()
-                panel = self.panels[newpanel]
-                if dirname:
-                    panel.openbook(dirname)
+            #elif newpanel == 'netbook':
+            #    dirname = self.panels['file'].get_value()
+            #    panel = self.panels[newpanel]
+            #    if dirname:
+            #        panel.openbook(dirname)
 
             self.panel_pos = newpanel
 
     def apply_exit(self):
         self.panels['text'].dump()
-        self.panels['netbook'].dump()
+        #self.panels['netbook'].dump()
         sys.exit()
 
     def run(self):
@@ -818,7 +828,7 @@ def main():
         cb = CuteBook()
         cb.run()
     except:
-        traceback.print_exc(file=logfile.log)
+        traceback.print_exc()
                                                                         
 if __name__ == '__main__':
     main()
